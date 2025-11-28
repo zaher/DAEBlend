@@ -90,14 +90,14 @@ def numarr_alpha(a, mult=1.0):
         s += " 1.0"
     return s
 
-
 def strarr(arr):
     return " ".join([strflt(e) for e in arr])
 
 
 def strflt(x):
-    return '{0:.4f}'.format(x)
-
+    #return '{0:.4f}'.format(x)
+    #return '{0:.4f}'.format(x).rstrip('0').rstrip('.')
+    return "{}".format(round(x, 4))
 
 class DaeExporter:
 
@@ -281,19 +281,19 @@ class DaeExporter:
         self.writel(S_FX, 2, '<profile_COMMON>')
 
         base = self.tex_or_color(shader.inputs['Base Color'], lookup)
-        emission = self.tex_or_color(shader.inputs['Emission'], lookup)
+        #emission = self.tex_or_color(shader.inputs['Emission'], lookup)
         alpha = self.tex_or_factor(shader.inputs['Alpha'], lookup)
-        specular = self.tex_or_factor(shader.inputs['Specular'], lookup)
+        #specular = self.tex_or_factor(shader.inputs['Specular'], lookup)
         normal = self.get_socket_image(shader.inputs['Normal'], lookup)
 
         sampler_sids = set()
         base_sampler = self.export_sampler2d(3, base['image_id'], sampler_sids)
-        emission_sampler = self.export_sampler2d(
-            3, emission['image_id'], sampler_sids)
+        #emission_sampler = self.export_sampler2d(
+        #    3, emission['image_id'], sampler_sids)
         alpha_sampler = self.export_sampler2d(
             3, alpha['image_id'], sampler_sids)
-        specular_sampler = self.export_sampler2d(
-            3, specular['image_id'], sampler_sids)
+        #specular_sampler = self.export_sampler2d(
+        #    3, specular['image_id'], sampler_sids)
         normal_sampler = self.export_sampler2d(3, normal, sampler_sids)
 
         self.writel(S_FX, 3, '<technique sid="common">')
@@ -303,18 +303,18 @@ class DaeExporter:
         self.writel(S_FX, 6, self.xml_tex_or_color(base, base_sampler))
         self.writel(S_FX, 5, '</diffuse>')
 
-        self.writel(S_FX, 5, '<emission>')
-        self.writel(S_FX, 6, self.xml_tex_or_color(emission, emission_sampler))
-        self.writel(S_FX, 5, '</emission>')
+        #self.writel(S_FX, 5, '<emission>')
+        #self.writel(S_FX, 6, self.xml_tex_or_color(emission, emission_sampler))
+        #self.writel(S_FX, 5, '</emission>')
 
         self.writel(S_FX, 5, '<transparent opaque="RGB_ONE">')
         self.writel(S_FX, 6, self.xml_tex_or_factor(alpha, alpha_sampler))
         self.writel(S_FX, 5, '</transparent>')
 
-        self.writel(S_FX, 5, '<specular>')
-        self.writel(S_FX, 6, self.xml_tex_or_factor(
-            specular, specular_sampler))
-        self.writel(S_FX, 5, '</specular>')
+        #self.writel(S_FX, 5, '<specular>')
+        #self.writel(S_FX, 6, self.xml_tex_or_factor(
+        #    specular, specular_sampler))
+        #self.writel(S_FX, 5, '</specular>')
 
         self.writel(S_FX, 5, '<shininess>')
         self.writel(S_FX, 6, '<float>' +
@@ -410,8 +410,8 @@ class DaeExporter:
             bm.free()
             mesh.update(calc_edges=True, calc_edges_loose=False)
 
-        if not mesh.has_custom_normals and mesh.use_auto_smooth:
-            mesh.calc_normals_split()
+        #if not mesh.has_custom_normals: #and mesh.use_auto_smooth:
+        #    mesh.calc_normals_split()
 
         if self.use_tangents:
             mesh.calc_tangents()
@@ -459,7 +459,7 @@ class DaeExporter:
 
         split_normals = []
         surface_split_normals = {}
-        if mesh.has_custom_normals or mesh.use_auto_smooth:
+        if mesh.has_custom_normals: #or mesh.use_auto_smooth:
             split_normals, surface_split_normals = self.loop_property_to_indexed(
                 loop_vertices, "normal")
 
@@ -1090,7 +1090,7 @@ class DaeExporter:
             float_values = " ".join([self.strxyz(v) for v in bitangents])
             array_bitangents_id = self.gen_unique_id(
                 mesh_id+'-bitangents-array')
-            self.writel(S_GEOM, 4, "<float_array id=\"{}\"count=\"{}\">{}</float_array>"
+            self.writel(S_GEOM, 4, "<float_array id=\"{}\" count=\"{}\">{}</float_array>"
                         .format(array_bitangents_id, len(bitangents) * 3, float_values))
             self.writel(S_GEOM, 4, "<technique_common>")
             self.writel(S_GEOM, 4, "<accessor source=\"{}\" count=\"{}\" stride=\"3\">"
@@ -1788,7 +1788,7 @@ class DaeExporter:
             return False
         if (not hasattr(node, "data")):
             return False
-        if (self.config["use_export_selected"] and not node.select):
+        if (self.config["use_export_selected"] and not node.select_get()):
             return False
         if (self.use_active_layers):
             valid = False
@@ -2757,7 +2757,7 @@ class DaeExporter:
         try:
             f.write(bytes('<?xml version="1.0" encoding="utf-8"?>\n', "UTF-8"))
             f.write(bytes(
-                '<COLLADA xmlns="http://www.collada.org/2008/03/COLLADASchema" version="1.5.0">\n', "UTF-8"))
+                '<COLLADA xmlns="http://www.collada.org/2008/03/COLLADASchema" version="1.5.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">\n', "UTF-8"))
 
             s = []
             for x in self.sections.keys():
