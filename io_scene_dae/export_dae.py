@@ -832,20 +832,23 @@ class DaeExporter:
         for node in meshes:
             armatures = self.node_skin_modifiers(node)
             for armature in armatures:
-                skin_id = self.gen_unique_id(
-                    node.name + "-" + armature.object.name + "-skin")
-                lu = {"skin": skin_id, "skeleton": armature.object.name}
-                if (not node in lookup["node_to_skin"]):
-                    lookup["node_to_skin"][node] = []
-                lookup["node_to_skin"][node].append(lu)
-                mesh_id = lookup["node_to_mesh"][node]["id"]
-                morph_id = lookup["node_to_morph_controller"].get(node, None)
-                if morph_id:
-                    attached_id = morph_id
+                if armature.object is None:
+                    print (armature.name + " modifier have no armature")
                 else:
-                    attached_id = mesh_id
-                self.export_skin_controller(
-                    depsgraph, node, armature.object, attached_id, skin_id)
+                    skin_id = self.gen_unique_id(
+                        node.name + "-" + armature.object.name + "-skin")
+                    lu = {"skin": skin_id, "skeleton": armature.object.name}
+                    if (not node in lookup["node_to_skin"]):
+                        lookup["node_to_skin"][node] = []
+                    lookup["node_to_skin"][node].append(lu)
+                    mesh_id = lookup["node_to_mesh"][node]["id"]
+                    morph_id = lookup["node_to_morph_controller"].get(node, None)
+                    if morph_id:
+                        attached_id = morph_id
+                    else:
+                        attached_id = mesh_id
+                    self.export_skin_controller(
+                        depsgraph, node, armature.object, attached_id, skin_id)
 
     def export_skin_controller(self, depsgraph, node, armature, mesh_id, skin_id):
 
