@@ -139,7 +139,7 @@ class DaeExporter:
             return name
 
     def writel(self, section, indent, text):
-        if (not (section in self.sections)):
+        if (section not in self.sections):
             self.sections[section] = []
         line = ""
         for x in range(indent):
@@ -358,7 +358,7 @@ class DaeExporter:
     def get_socket_image(self, socket, lookup):
         if socket.is_linked:
             linked_node = socket.links[0].from_node
-            if type(linked_node) == bpy.types.ShaderNodeTexImage:
+            if isinstance(linked_node, bpy.types.ShaderNodeTexImage):
                 image = linked_node.image
                 image_id = lookup['image'].get(image, None)
                 if not image_id:
@@ -460,8 +460,7 @@ class DaeExporter:
         split_normals = []
         surface_split_normals = {}
         if mesh.has_custom_normals: #or mesh.use_auto_smooth:
-            split_normals, surface_split_normals = self.loop_property_to_indexed(
-                loop_vertices, "normal")
+            split_normals, surface_split_normals = self.loop_property_to_indexed(loop_vertices, "normal")
 
         surface_tangent_indices = {}
         tangents = []
@@ -474,13 +473,13 @@ class DaeExporter:
                 loop_vertices, "bitangent")
 
         # get uv's
-        if (mesh.uv_layers != None) and (mesh.uv_layers.active != None):
+        if (mesh.uv_layers is not None) and (mesh.uv_layers.active is not None):
             uv_layer = mesh.uv_layers.active.data
         else:
             uv_layer = None
 
         uv = []
-        if (uv_layer != None):
+        if (uv_layer is not None):
             # get all uv values, removing duplicates
             uv = list({uv.uv.copy().freeze() for uv in uv_layer.values()})
 
@@ -565,7 +564,7 @@ class DaeExporter:
 
             # group by material index, retrieve the materials for each group
 
-            if (not (f.material_index in vertices)):
+            if (f.material_index not in vertices):
                 vertices[f.material_index] = []
 
             loop_vertices = vertices[f.material_index]
@@ -725,7 +724,7 @@ class DaeExporter:
     def export_morph_controllers(self, depsgraph, lookup):
         geometry_morphs = {
             node: value for node, value in lookup["node_to_mesh"].items()
-            if value["morphs"] != None}
+            if value["morphs"] is not None}
 
         # Create a key:controller id dict based on shape keys to perform deduplication.
         # Morph controllers that have the same shape keys for the same meshes must
@@ -736,7 +735,7 @@ class DaeExporter:
             if node not in lookup["node_to_morph_controller"]:
                 targets = values["morphs"]
                 key_targets = ".".join(t['id'] for t in targets)
-                if not key_targets in targets_to_morph_controller:
+                if key_targets not in targets_to_morph_controller:
                     morph_id = self.gen_unique_id(node.data.name + "-morph")
                     self.export_morph_controller(targets, morph_id, True)
                     lookup["node_to_morph_controller"][node] = morph_id
@@ -809,7 +808,7 @@ class DaeExporter:
     def node_has_generate_modifiers(self, node):
         if hasattr(node, "modifiers"):
             has = next(
-                (mod for mod in node.modifiers if mod.show_render and mod.type != "ARMATURE"), None) != None
+                (mod for mod in node.modifiers if mod.show_render and mod.type != "ARMATURE"), None) is not None
         else:
             has = False
 
@@ -822,7 +821,7 @@ class DaeExporter:
             return ()
 
     def node_has_skin_modifier(self, node):
-        return next((self.node_skin_modifiers(node)), None) != None
+        return next((self.node_skin_modifiers(node)), None) is not None
 
     def export_skin_controllers(self, depsgraph, lookup):
         meshes = {node
@@ -838,7 +837,7 @@ class DaeExporter:
                     skin_id = self.gen_unique_id(
                         node.name + "-" + armature.object.name + "-skin")
                     lu = {"skin": skin_id, "skeleton": armature.object.name}
-                    if (not node in lookup["node_to_skin"]):
+                    if (node not in lookup["node_to_skin"]):
                         lookup["node_to_skin"][node] = []
                     lookup["node_to_skin"][node].append(lu)
                     mesh_id = lookup["node_to_mesh"][node]["id"]
@@ -1260,7 +1259,7 @@ class DaeExporter:
         # get the transform relative to the parent bone.
 
         parent = self.get_bone_deform_parent(bone)
-        if (parent != None) and not self.is_zero_scale(parent.matrix_local):
+        if (parent is not None) and not self.is_zero_scale(parent.matrix_local):
             matrix = parent.matrix_local.inverted() @ bone.matrix_local
         else:
             matrix = bone.matrix_local.copy()
@@ -1325,7 +1324,7 @@ class DaeExporter:
         lookup["skeleton_info"][node] = {}
 
         for bone in armature.bones:
-            if (bone.parent != None):
+            if (bone.parent is not None):
                 # this node will be exported when the parent exports its
                 # children
                 continue
@@ -1713,11 +1712,11 @@ class DaeExporter:
         # parenting
 
         def get_children_of_bones(children, parenting_map):
-            if (children == None):
+            if (children is None):
                 return
             for child in children:
-                if (hasattr(child, "parent_bone") and (child.parent_bone != None)):
-                    if (not child.parent_bone in parenting_map):
+                if (hasattr(child, "parent_bone") and (child.parent_bone is not None)):
+                    if (child.parent_bone not in parenting_map):
                         parenting_map[child.parent_bone] = []
                     parenting_map[child.parent_bone].append(child)
                 get_children_of_bones(child.children, parenting_map)
@@ -1787,7 +1786,7 @@ class DaeExporter:
         self.writel(S_MATS, 1, '</material>')
 
     def is_node_valid(self, node):
-        if node == None:
+        if node is None:
             return False
         if (not hasattr(node, "data")):
             return False
@@ -1810,8 +1809,8 @@ class DaeExporter:
                 continue
             if (self.is_node_valid(obj)):
                 n = obj
-                while (n != None):
-                    if (not n in self.visual_nodes):
+                while (n is not None):
+                    if (n not in self.visual_nodes):
                         self.visual_nodes.add(n)
                     n = n.parent
 
@@ -1822,7 +1821,7 @@ class DaeExporter:
 
     def export_physics_materials(self, physics_nodes, lookup):
         for node in physics_nodes:
-            if (not node.data in lookup["physics_material"]):
+            if (node.data not in lookup["physics_material"]):
                 physics_material_id = self.gen_unique_id(
                     node.data.name + '-phys_mat')
                 lookup["physics_material"][node.data] = physics_material_id
@@ -1843,7 +1842,7 @@ class DaeExporter:
 
     def export_physics_rigid_body_models(self, physics_nodes, lookup):
         for node in physics_nodes:
-            if (not node.data in lookup["physics_rigid_body"]):
+            if (node.data not in lookup["physics_rigid_body"]):
                 physics_model_id = self.gen_unique_id(
                     node.data.name + '-model')
                 physics_body_sid = self.gen_unique_id(node.data.name + '-body')
@@ -1907,7 +1906,7 @@ class DaeExporter:
         self.writel(S_P_MODEL, 1, '</physics_model>')
 
     def export_physics_scene(self, physics_nodes, lookup):
-        if (self.bpy_context_scene.rigidbody_world == None):
+        if (self.bpy_context_scene.rigidbody_world is None):
             return
 
         physics_scene_id = self.gen_unique_id(
@@ -2052,7 +2051,7 @@ class DaeExporter:
 
     def export_convex_hull_shape(self, node, il, lookup):
         mesh_id = self.get_physics_mesh_id(node, lookup)
-        if (mesh_id != None):
+        if (mesh_id is not None):
             self.writel(S_P_MODEL, il,
                         '<instance_geometry url="{}"/>'.format(self.ref_id(mesh_id)))
         else:
@@ -2085,7 +2084,7 @@ class DaeExporter:
                     '" name="' + self.bpy_context_scene.name + '">')
 
         for obj in self.visual_nodes:
-            if (obj.parent == None):
+            if (obj.parent is None):
                 self.export_node(S_NODES, obj, 2, True, lookup)
 
         self.writel(S_NODES, 1, '</visual_scene>')
@@ -2349,7 +2348,7 @@ class DaeExporter:
                         key_name = node.data.shape_keys.key_blocks[i].name
                         target = key_name+":" + morph_id + \
                             "/MORPH_WEIGHT_TO_TARGET("+str(i-1)+")"
-                        if (not (target in blend_cache)):
+                        if (target not in blend_cache):
                             blend_cache[target] = []
                         self.append_morph_keyframe_if_different(
                             blend_cache[target], key, node.data.shape_keys.key_blocks[i].value)
@@ -2366,14 +2365,14 @@ class DaeExporter:
                     transform = self.get_posebone_transform(
                         node.pose.bones, posebone)
                     if transform:
-                        if (not (bone_node_id in xform_cache)):
+                        if (bone_node_id not in xform_cache):
                             xform_cache[bone_node_id] = []
                         self.append_keyframe_if_different(
                             xform_cache[bone_node_id], transform, key)
 
             transform, visible = self.get_node_local_transform(node)
             if visible:
-                if (not (node_id in xform_cache)):
+                if (node_id not in xform_cache):
                     xform_cache[node_id] = []
                 self.append_keyframe_if_different(
                     xform_cache[node_id], transform, key)
