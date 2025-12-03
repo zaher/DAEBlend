@@ -38,14 +38,14 @@ bl_info = {
     "category": "Import-Export"}
 
 if "bpy" in locals():
-    import imp
+    import importlib
     if "export_dae" in locals():
-        imp.reload(export_dae)
+        importlib.reload(export_dae)
 
 
 class ExportDAE(bpy.types.Operator, ExportHelper):
     '''Export to DAE'''
-    bl_idname = "export_scene.dae"
+    bl_idname = "export_scene.dae_blend"
     bl_label = "Export DAE"
     bl_options = {'PRESET'}
 
@@ -110,7 +110,7 @@ class ExportDAE(bpy.types.Operator, ExportHelper):
         description="Style of animation clips",
         default='NONE',
     )
-    
+
     def check_extension(self):
         return True  # return self.batch_mode == 'OFF'
 

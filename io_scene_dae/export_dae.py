@@ -16,7 +16,6 @@
 #
 # ##### END GPL LICENSE BLOCK #####
 from bpy_types import Node
-from platform import node
 import os
 import time
 import math  # math.pi
@@ -2341,7 +2340,7 @@ class DaeExporter:
             if orig_node in lookup["node_to_morph_controller"]:
                 morph_id = lookup["node_to_morph_controller"][orig_node]
 
-                if not morph_id in morph_controller_crumb:
+                if morph_id not in morph_controller_crumb:
                     morph_controller_crumb.add(morph_id)
 
                     for i in range(1, len(node.data.shape_keys.key_blocks)):
