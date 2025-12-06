@@ -386,8 +386,7 @@ class DaeExporter:
     def get_mesh(self, depsgraph, node):
 
         # get a mesh for this node
-        mesh = node.evaluated_get(depsgraph).to_mesh(
-            preserve_all_data_layers=True, depsgraph=depsgraph)
+        mesh = node.evaluated_get(depsgraph).to_mesh(preserve_all_data_layers=True, depsgraph=depsgraph)
 
         if not mesh or not len(mesh.polygons):
             # mesh has no polygons so abort
@@ -466,10 +465,8 @@ class DaeExporter:
         surface_bitangent_indices = {}
         bitangents = []
         if self.use_tangents:
-            tangents, surface_tangent_indices = self.loop_property_to_indexed(
-                loop_vertices, "tangent")
-            bitangents, surface_bitangent_indices = self.loop_property_to_indexed(
-                loop_vertices, "bitangent")
+            tangents, surface_tangent_indices = self.loop_property_to_indexed(loop_vertices, "tangent")
+            bitangents, surface_bitangent_indices = self.loop_property_to_indexed(loop_vertices, "bitangent")
 
         # get uv's
         if (mesh.uv_layers is not None) and (mesh.uv_layers.active is not None):
@@ -700,14 +697,10 @@ class DaeExporter:
                 node.active_shape_key_index = k
                 shape.value = 1.0
                 mesh.update()
-                morph_id = self.gen_unique_id(
-                    node.data.name + "-" + shape.name)
-                export_mesh = self.get_mesh(
-                    bpy.context.evaluated_depsgraph_get(), node)
-                material_bind = self.export_mesh(
-                    export_mesh, morph_id, morph_id)
-                morph_targets.append(
-                    {"id": morph_id, "material_bind": material_bind, "weight": values[k]})
+                morph_id = self.gen_unique_id(node.data.name + "-" + shape.name)
+                export_mesh = self.get_mesh(bpy.context.evaluated_depsgraph_get(), node)
+                material_bind = self.export_mesh(export_mesh, morph_id, morph_id)
+                morph_targets.append({"id": morph_id, "material_bind": material_bind, "weight": values[k]})
                 shape.value = values[k]
 
             node.show_only_shape_key = scene_show_only_shape_key
@@ -1851,22 +1844,17 @@ class DaeExporter:
                     node, physics_model_id, physics_body_sid, lookup)
 
     def export_physics_rigid_body_model(self, node, physics_model_id, physics_body_sid, lookup):
-        self.writel(
-            S_P_MODEL, 1, '<physics_model id="{}">'.format(physics_model_id))
-        self.writel(
-            S_P_MODEL, 2, '<rigid_body sid="{}">'.format(physics_body_sid))
+        self.writel(S_P_MODEL, 1, '<physics_model id="{}">'.format(physics_model_id))
+        self.writel(S_P_MODEL, 2, '<rigid_body sid="{}">'.format(physics_body_sid))
         self.writel(S_P_MODEL, 3, '<technique_common>')
-        self.writel(S_P_MODEL, 4, '<dynamic>{}</dynamic>'.format(
-            str(node.rigid_body.type == 'ACTIVE').lower()))
-        self.writel(
-            S_P_MODEL, 4, '<mass>{}</mass>'.format(node.rigid_body.mass))
+        self.writel(S_P_MODEL, 4, '<dynamic>{}</dynamic>'.format(str(node.rigid_body.type == 'ACTIVE').lower()))
+        self.writel(S_P_MODEL, 4, '<mass>{}</mass>'.format(node.rigid_body.mass))
         self.writel(S_P_MODEL, 4, '<mass_frame>')
         self.writel(S_P_MODEL, 5, '<translate>0 0 0</translate>')
         self.writel(S_P_MODEL, 5, '<rotate>0 0 1 0</rotate>')
         self.writel(S_P_MODEL, 4, '</mass_frame>')
         self.writel(S_P_MODEL, 4, '<shape>')
-        self.writel(S_P_MODEL, 5, '<instance_physics_material url="{}"/>'.format(
-            self.ref_id(lookup['physics_material'][node.data])))
+        self.writel(S_P_MODEL, 5, '<instance_physics_material url="{}"/>'.format(self.ref_id(lookup['physics_material'][node.data])))
         self.shape_funcs[node.rigid_body.collision_shape](node, 5, lookup)
         self.export_collision_margin(node, 5)
 
@@ -1875,10 +1863,8 @@ class DaeExporter:
 
         self.writel(S_P_MODEL, 3, '<extra>')
         self.writel(S_P_MODEL, 4, '<technique profile="bullet">')
-        self.writel(
-            S_P_MODEL, 5, '<linear_damping>{}</linear_damping>'.format(node.rigid_body.linear_damping))
-        self.writel(
-            S_P_MODEL, 5, '<angular_damping>{}</angular_damping>'.format(node.rigid_body.angular_damping))
+        self.writel(S_P_MODEL, 5, '<linear_damping>{}</linear_damping>'.format(node.rigid_body.linear_damping))
+        self.writel(S_P_MODEL, 5, '<angular_damping>{}</angular_damping>'.format(node.rigid_body.angular_damping))
         if(node.rigid_body.use_deactivation):
             self.writel(S_P_MODEL, 5, '<deactivation use="true">')
             self.writel(S_P_MODEL, 6, '<linear_velocity>{}</linear_velocity>'.format(
@@ -1888,11 +1874,9 @@ class DaeExporter:
             self.writel(S_P_MODEL, 6, '<start>{}</start>'.format(
                 str(node.rigid_body.use_start_deactivated).lower()))
             self.writel(S_P_MODEL, 5, '</deactivation>')
-        collision_collections = [str(i) for (i, g) in enumerate(
-            node.rigid_body.collision_collections) if g]
+        collision_collections = [str(i) for (i, g) in enumerate(node.rigid_body.collision_collections) if g]
         if (len(collision_collections)):
-            self.writel(
-                S_P_MODEL, 5, '<collision_filter_groups>{}</collision_filter_groups>'.format(" ".join(collision_collections)))
+            self.writel(S_P_MODEL, 5, '<collision_filter_groups>{}</collision_filter_groups>'.format(" ".join(collision_collections)))
         linear_factor = [1.0, 1.0, 1.0]
         angular_factor = [1.0, 1.0, 1.0]
         self.writel(
@@ -2796,7 +2780,6 @@ class DaeExporter:
         self.use_tangents = self.config['calc_tangents']
         self.overstuff_bones = False
         self.use_active_layers = False
-
 
 def save(operator, context,
          filepath="",
