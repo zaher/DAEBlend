@@ -457,7 +457,8 @@ class DaeExporter:
 
         split_normals = []
         surface_split_normals = {}
-        if mesh.has_custom_normals: #or mesh.use_auto_smooth:
+        #if mesh.has_custom_normals: #or mesh.use_auto_smooth:
+        if True: #always get split_normals or need to check sharp_face attribute
             split_normals, surface_split_normals = self.loop_property_to_indexed(loop_vertices, "normal")
 
         surface_tangent_indices = {}
