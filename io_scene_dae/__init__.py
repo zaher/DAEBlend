@@ -27,8 +27,8 @@ import bpy
 bl_info = {
     "name": "Python Collada Exporter",
     "author": "Gregery Barton",
-    "version": (2, 0, 1),
-    "blender": (2, 90, 0),
+    "version": (2, 1, 1),
+    "blender": (4, 0, 0),
     "location": "File > Import-Export",
     "description": ("Export DAE Scenes."),
     "warning": "",

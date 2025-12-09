@@ -33,7 +33,6 @@ from urllib.parse import urlparse
 # Contact: gregery20@yahoo.com.au
 #
 
-
 """
 This script is an exporter to the Khronos Collada file format.
 
@@ -516,7 +515,7 @@ class DaeExporter:
         else:
             colors = []
 
-        # Pools of  values:
+        # Pools of values:
         # vertices = array of xyz point tuples
         # colors = array of r,g,b,a color tuples
         # normals = array of xyz vector tuples
@@ -641,8 +640,7 @@ class DaeExporter:
                     if (self.node_has_convex_hull(node)):
                         convex_mesh = self.mesh_to_convex_hull(mesh)
                         convex_mesh_id = mesh_id + "-convex"
-                        self.export_mesh(
-                            convex_mesh, convex_mesh_id, node.data.name, True)
+                        self.export_mesh(convex_mesh, convex_mesh_id, node.data.name, True)
                         lookup["convex_mesh"][node] = convex_mesh_id
 
                     morphs = None
@@ -861,8 +859,7 @@ class DaeExporter:
 
         self.writel(S_SKIN, 1, '<controller id="' + skin_id + '">')
         self.writel(S_SKIN, 2, '<skin source="' + self.ref_id(mesh_id) + '">')
-        self.writel(S_SKIN, 3, '<bind_shape_matrix>' +
-                    self.strmtx(node.matrix_world) + '</bind_shape_matrix>')
+        self.writel(S_SKIN, 3, '<bind_shape_matrix>' + self.strmtx(node.matrix_world) + '</bind_shape_matrix>')
 
         # Joint Names
 
@@ -888,8 +885,7 @@ class DaeExporter:
 
         source_bind_poses_id = self.gen_unique_id(skin_id + '-bind_poses')
         self.writel(S_SKIN, 3, '<source id="' + source_bind_poses_id + '">')
-        pose_values = " ".join([self.strmtx(matrix)
-                                for matrix in pose_matrices])
+        pose_values = " ".join([self.strmtx(matrix) for matrix in pose_matrices])
         array_bind_poses_id = self.gen_unique_id(skin_id + '-bind_poses-array')
         self.writel(S_SKIN, 4, '<float_array id="' + array_bind_poses_id+'" count="' +
                     str(len(pose_matrices) * 16) + '">' + pose_values + '</float_array>')
@@ -1414,8 +1410,7 @@ class DaeExporter:
 
     def export_curve(self, curve, spline_id):
 
-        self.writel(S_GEOM, 1, '<geometry id="' +
-                    spline_id + '" name="' + curve.name + '">')
+        self.writel(S_GEOM, 1, '<geometry id="' + spline_id + '" name="' + curve.name + '">')
         self.writel(S_GEOM, 2, '<spline closed="0">')
 
         points = []
@@ -1503,8 +1498,7 @@ class DaeExporter:
         self.writel(S_GEOM, 3, '<source id="' +
                     source_interpolations_id + '">')
         interpolation_values = " ".join([str(x) for x in interps])
-        array_interpolations_id = self.gen_unique_id(
-            spline_id + '-interpolations-array')
+        array_interpolations_id = self.gen_unique_id(spline_id + '-interpolations-array')
         self.writel(S_GEOM, 4, '<Name_array id="'+array_interpolations_id + '" count="' +
                     str(len(interps)) + '">' + interpolation_values + '</Name_array>')
         self.writel(S_GEOM, 4, '<technique_common>')
@@ -1556,10 +1550,10 @@ class DaeExporter:
         if (self.transform_matrix_scale):
             transforms = [
                 self.get_matrix_transform_xml(transform["matrix"]),
-                self.get_scale_xml(transform["scale"])]
+                self.get_scale_xml(transform["scale"])
+                ]
         else:
-            transforms = [
-                self.get_matrix_transform_xml(transform["matrix"])]
+            transforms = [self.get_matrix_transform_xml(transform["matrix"])]
 
         return [e for t in transforms for e in t]
 
@@ -1608,7 +1602,7 @@ class DaeExporter:
 
     def export_node(self, section, node, il, recurse, lookup):
         # export a scene node as a Collada node
-
+        ##TODO @Zaher option to instance objects
         prev_id = lookup["nodes"].get(node, None)
         if prev_id:
             # previously exported node is occurring again
@@ -1676,8 +1670,7 @@ class DaeExporter:
                                 '<instance_light url="' + self.ref_id(light_id) + '"/>')
             else:
                 if node.instance_type == "COLLECTION":
-                    self.writel(
-                        section, il, '<instance_node url="{}"/>'.format(self.ref_library(node.instance_collection)))
+                    self.writel(section, il, '<instance_node url="{}"/>'.format(self.ref_library(node.instance_collection)))
 
         if recurse:
             for x in [child for child in node.children if child.parent_type != "BONE"]:
@@ -1755,7 +1748,6 @@ class DaeExporter:
             if slot.material not in lookup["material"]}
 
         # export library_effects content
-
         for mat in materials:
             effect_id = self.gen_unique_id(mat.name + "-effect")
             lookup["effect"][mat] = effect_id
@@ -1824,12 +1816,9 @@ class DaeExporter:
         self.writel(S_P_MATS, 1, '<physics_material id ="{}">'.format(
             physics_material_id))
         self.writel(S_P_MATS, 2, '<technique_common>')
-        self.writel(
-            S_P_MATS, 3, '<dynamic_friction>{}</dynamic_friction>'.format(node.rigid_body.friction))
-        self.writel(
-            S_P_MATS, 3, '<static_friction>{}</static_friction>'.format(node.rigid_body.friction))
-        self.writel(
-            S_P_MATS, 3, '<restitution>{}</restitution>'.format(node.rigid_body.restitution))
+        self.writel(S_P_MATS, 3, '<dynamic_friction>{}</dynamic_friction>'.format(node.rigid_body.friction))
+        self.writel(S_P_MATS, 3, '<static_friction>{}</static_friction>'.format(node.rigid_body.friction))
+        self.writel(S_P_MATS, 3, '<restitution>{}</restitution>'.format(node.rigid_body.restitution))
         self.writel(S_P_MATS, 2, '</technique_common>')
         self.writel(S_P_MATS, 1, '</physics_material>')
 
@@ -1856,7 +1845,7 @@ class DaeExporter:
         self.writel(S_P_MODEL, 4, '</mass_frame>')
         self.writel(S_P_MODEL, 4, '<shape>')
         self.writel(S_P_MODEL, 5, '<instance_physics_material url="{}"/>'.format(self.ref_id(lookup['physics_material'][node.data])))
-        self.shape_funcs[node.rigid_body.collision_shape](node, 5, lookup)
+        self.shape_funcs[node.rigid_body.collision_shape](node, 5, lookup) ##TODO @Zaher test it please
         self.export_collision_margin(node, 5)
 
         self.writel(S_P_MODEL, 4, '</shape>')
@@ -1880,10 +1869,8 @@ class DaeExporter:
             self.writel(S_P_MODEL, 5, '<collision_filter_groups>{}</collision_filter_groups>'.format(" ".join(collision_collections)))
         linear_factor = [1.0, 1.0, 1.0]
         angular_factor = [1.0, 1.0, 1.0]
-        self.writel(
-            S_P_MODEL, 5, '<linear_factor>{}</linear_factor>'.format(self.strxyz(linear_factor, True)))
-        self.writel(
-            S_P_MODEL, 5, '<angular_factor>{}</angular_factor>'.format(self.strxyz(angular_factor, True)))
+        self.writel(S_P_MODEL, 5, '<linear_factor>{}</linear_factor>'.format(self.strxyz(linear_factor, True)))
+        self.writel(S_P_MODEL, 5, '<angular_factor>{}</angular_factor>'.format(self.strxyz(angular_factor, True)))
         self.writel(S_P_MODEL, 4, '</technique>')
         self.writel(S_P_MODEL, 3, '</extra>')
         self.writel(S_P_MODEL, 2, '</rigid_body>')
@@ -2013,11 +2000,9 @@ class DaeExporter:
     def export_cylinder_shape(self, node, il, lookup):
         dimensions = self.get_node_dimensions(node)
         self.writel(S_P_MODEL, il, "<cylinder>")
-        self.writel(S_P_MODEL, il + 1,
-                    "<height>{}</height>".format(dimensions[2]))
+        self.writel(S_P_MODEL, il + 1, "<height>{}</height>".format(dimensions[2]))
         radius = max(dimensions[0], dimensions[1]) / 2.0
-        self.writel(S_P_MODEL, il + 1,
-                    "<radius>{} {}</radius>".format(radius, radius))
+        self.writel(S_P_MODEL, il + 1, "<radius>{} {}</radius>".format(radius, radius))
         self.writel(S_P_MODEL, il, "</cylinder>")
 
     def export_cone_shape(self, node, il, lookup):
@@ -2064,8 +2049,7 @@ class DaeExporter:
     def export_scene(self, lookup):
 
         visual_scene_id = self.gen_unique_id(self.bpy_context_scene.name)
-        self.writel(S_NODES, 1, '<visual_scene id="' + visual_scene_id +
-                    '" name="' + self.bpy_context_scene.name + '">')
+        self.writel(S_NODES, 1, '<visual_scene id="' + visual_scene_id + '" name="' + self.bpy_context_scene.name + '">')
 
         for obj in self.visual_nodes:
             if (obj.parent is None):
@@ -2077,13 +2061,10 @@ class DaeExporter:
         self.writel(S_ASSET, 0, '<asset>')
         self.writel(S_ASSET, 1, '<contributor>')
         self.writel(S_ASSET, 2, '<author> Anonymous </author>')
-        self.writel(
-            S_ASSET, 2, '<authoring_tool> Collada Exporter for Blender 2.9+, by Gregery Barton </authoring_tool>')
+        self.writel(S_ASSET, 2, '<authoring_tool> Collada Exporter for Blender 2.9+, by Gregery Barton </authoring_tool>')
         self.writel(S_ASSET, 1, '</contributor>')
-        self.writel(S_ASSET, 1, '<created>' +
-                    time.strftime("%Y-%m-%dT%H:%M:%SZ  ") + '</created>')
-        self.writel(S_ASSET, 1, '<modified>' +
-                    time.strftime("%Y-%m-%dT%H:%M:%SZ") + '</modified>')
+        self.writel(S_ASSET, 1, '<created>' + time.strftime("%Y-%m-%dT%H:%M:%SZ  ") + '</created>')
+        self.writel(S_ASSET, 1, '<modified>' + time.strftime("%Y-%m-%dT%H:%M:%SZ") + '</modified>')
         self.writel(S_ASSET, 1, '<unit meter="1.0" name="meter"/>')
         if self.axis_type == "ZUP":
             axis = "Z_UP"
@@ -2742,8 +2723,10 @@ class DaeExporter:
             return False
         try:
             f.write(bytes('<?xml version="1.0" encoding="utf-8"?>\n', "UTF-8"))
-            f.write(bytes(
-                '<COLLADA xmlns="http://www.collada.org/2008/03/COLLADASchema" version="1.5.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">\n', "UTF-8"))
+            if self.config['opensim']:
+                f.write(bytes('<COLLADA xmlns="http://www.collada.org/2005/11/COLLADASchema" version="1.4.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">\n', "UTF-8"))
+            else:
+                f.write(bytes('<COLLADA xmlns="http://www.collada.org/2008/03/COLLADASchema" version="1.5.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">\n', "UTF-8"))
 
             s = []
             for x in self.sections.keys():
@@ -2781,6 +2764,7 @@ class DaeExporter:
         self.use_tangents = self.config['calc_tangents']
         self.overstuff_bones = False
         self.use_active_layers = False
+        self.config['opensim'] = True
 
 def save(operator, context,
          filepath="",
