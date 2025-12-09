@@ -15,7 +15,9 @@
 #  Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 #
 # ##### END GPL LICENSE BLOCK #####
-from bpy_types import Node
+import mathutils
+import math
+import bpy 
 import os
 import time
 import math  # math.pi
@@ -32,6 +34,7 @@ from urllib.parse import urlparse
 # Author: Gregery Barton
 # Contact: gregery20@yahoo.com.au
 #
+
 
 """
 This script is an exporter to the Khronos Collada file format.
@@ -393,11 +396,12 @@ class DaeExporter:
 
         # force triangulation if the mesh has polygons with more than 4 sides
         # corrupts custom normals
-        force_triangluation = False
-        for polygon in mesh.polygons:
-            if (polygon.loop_total > 4):
-                force_triangluation = True
-                break
+        force_triangluation = self.triangulate
+        if not force_triangluation:
+            for polygon in mesh.polygons:
+                if (polygon.loop_total > 4):
+                    force_triangluation = True
+                    break
 
         if (force_triangluation):
             bm = bmesh.new()
@@ -515,7 +519,7 @@ class DaeExporter:
         else:
             colors = []
 
-        # Pools of values:
+        # Pools of  values:
         # vertices = array of xyz point tuples
         # colors = array of r,g,b,a color tuples
         # normals = array of xyz vector tuples
@@ -637,10 +641,11 @@ class DaeExporter:
 
                     # export convex hull if needed by physics scene
 
-                    if (self.node_has_convex_hull(node)):
+                    if (self.has_physics and self.node_has_convex_hull(node)):
                         convex_mesh = self.mesh_to_convex_hull(mesh)
                         convex_mesh_id = mesh_id + "-convex"
-                        self.export_mesh(convex_mesh, convex_mesh_id, node.data.name, True)
+                        self.export_mesh(
+                            convex_mesh, convex_mesh_id, node.data.name, True)
                         lookup["convex_mesh"][node] = convex_mesh_id
 
                     morphs = None
@@ -846,14 +851,10 @@ class DaeExporter:
             group_names = [group.name for group in node.vertex_groups.values(
             ) if group.name in armature.data.bones]
         else:
-            # put every bone from the armature into the skin because reasons
-
+            # put not deforming bones in the skin too
             group_names = [group for group in armature.data.bones.keys()]
 
-        missing_group_names = {group.name for group in node.vertex_groups.values(
-        ) if group.name not in armature.data.bones}
-        group_names_index = dict({k: v for (v, k) in enumerate(group_names)}.items() | {
-            k: -1 for k in missing_group_names}.items())
+        group_names_index = dict({k: v for (v, k) in enumerate(group_names)}.items())
 
         mesh = self.get_mesh(depsgraph, node)
 
@@ -865,23 +866,28 @@ class DaeExporter:
 
         source_joints_id = self.gen_unique_id(skin_id + '-joints')
         self.writel(S_SKIN, 3, '<source id="'+source_joints_id + '">')
-        name_values = " ".join([self.quote_spaces(name)
-                                for name in group_names])
+        name_values = " ".join([self.quote_spaces(name) for name in group_names])
         name_array_joints_id = self.gen_unique_id(skin_id + '-joints-array')
-        self.writel(S_SKIN, 4, '<Name_array id="'+name_array_joints_id + '" count="' +
-                    str(len(group_names)) + '">' + name_values + '</Name_array>')
+        self.writel(S_SKIN, 4, '<IDREF_array id="' + name_array_joints_id + '" count="' + str(len(group_names)) + '">' + name_values + '</IDREF_array>')
         self.writel(S_SKIN, 4, '<technique_common>')
-        self.writel(S_SKIN, 4, '<accessor source="'+self.ref_id(name_array_joints_id) +
-                    '" count="' + str(len(group_names)) + '" stride="1">')
-        self.writel(S_SKIN, 5, '<param name="JOINT" type="Name"/>')
-        self.writel(S_SKIN, 4, '</accessor>')
+        self.writel(S_SKIN, 5, '<accessor source="'+self.ref_id(name_array_joints_id) + '" count="' + str(len(group_names)) + '" stride="1">')
+        self.writel(S_SKIN, 6, '<param name="JOINT" type="Name"/>')
+        self.writel(S_SKIN, 5, '</accessor>')
         self.writel(S_SKIN, 4, '</technique_common>')
         self.writel(S_SKIN, 3, '</source>')
 
         # Pose Matrices!
 
         bones = [armature.data.bones[name] for name in group_names]
-        pose_matrices = [bone.matrix_local.inverted() for bone in bones]
+        
+        
+        pose_matrices = []
+
+        if self.config["version"] == "141SL":
+            # Second life wants no rotations in the pose matrices
+            pose_matrices = [Matrix.Translation(bone.matrix_local.to_translation()).inverted() for bone in bones]
+        else:
+            pose_matrices = [bone.matrix_local.inverted() for bone in bones]
 
         source_bind_poses_id = self.gen_unique_id(skin_id + '-bind_poses')
         self.writel(S_SKIN, 3, '<source id="' + source_bind_poses_id + '">')
@@ -899,8 +905,7 @@ class DaeExporter:
 
         # Skin Weights!
 
-        weights = list(
-            {group.weight for v in mesh.vertices for group in v.groups})
+        weights = list({group.weight for v in mesh.vertices for group in v.groups})
         weights_index = {k: v for (v, k) in enumerate(weights)}
         vertex_weights = [[[group_names_index[node.vertex_groups[g.group].name],
                             weights_index[g.weight]] for g in v.groups] for v in mesh.vertices]
@@ -1134,8 +1139,7 @@ class DaeExporter:
         for mat_index, polygons in surface_v_indices.items():
 
             # Triangle Lists
-            triangulated = not next(
-                (p for p in polygons if len(p) != 3), False)
+            triangulated = not next((p for p in polygons if len(p) != 3), False)
             if (triangulated):
                 prim_type = "triangles"
             else:
@@ -1352,10 +1356,8 @@ class DaeExporter:
                         strflt(camera.ortho_scale * 0.5) + ' </xmag>')  # I think?
             self.writel(S_CAMS, 5, '<aspect_ratio> ' + strflt(self.bpy_context_scene.render.resolution_x /
                                                               self.bpy_context_scene.render.resolution_y) + ' </aspect_ratio>')
-            self.writel(S_CAMS, 5, '<znear> ' +
-                        strflt(camera.clip_start) + ' </znear>')
-            self.writel(S_CAMS, 5, '<zfar> ' +
-                        strflt(camera.clip_end) + ' </zfar>')
+            self.writel(S_CAMS, 5, '<znear> ' + strflt(camera.clip_start) + ' </znear>')
+            self.writel(S_CAMS, 5, '<zfar> ' + strflt(camera.clip_end) + ' </zfar>')
             self.writel(S_CAMS, 4, '</orthographic>')
 
         self.writel(S_CAMS, 3, '</technique_common>')
@@ -1374,38 +1376,26 @@ class DaeExporter:
 
         self.writel(S_LAMPS, 1, '<light id="' + light_id +
                     '" name="' + light.name + '">')
-        # self.writel(S_LAMPS,2,'<optics>')
-        self.writel(S_LAMPS, 3, '<technique_common>')
+        self.writel(S_LAMPS, 2, '<technique_common>')
 
         if (light.type == "POINT"):
-            self.writel(S_LAMPS, 4, '<point>')
-            self.writel(S_LAMPS, 5, '<color>' +
-                        strarr(light.color) + '</color>')
-            self.writel(S_LAMPS, 5, '<linear_attenuation>' +
-                        strflt(light.linear_attenuation) + '</linear_attenuation>')
-            self.writel(S_LAMPS, 5, '<quadratic_attenuation>' +
-                        strflt(light.quadratic_attenuation) + '</quadratic_attenuation>')
-            self.writel(S_LAMPS, 5, '<zfar>' +
-                        strflt(light.cutoff_distance) + '</zfar>')
-            self.writel(S_LAMPS, 4, '</point>')
+            self.writel(S_LAMPS, 3, '<point>')
+            self.writel(S_LAMPS, 4, '<color>' + strarr(light.color) + '</color>')
+            self.writel(S_LAMPS, 4, '<zfar>' + strflt(light.cutoff_distance) + '</zfar>')
+            self.writel(S_LAMPS, 3, '</point>')
         elif (light.type == "SPOT"):
-            self.writel(S_LAMPS, 4, '<spot>')
-            self.writel(S_LAMPS, 5, '<color>' +
-                        strarr(light.color) + '</color>')
+            self.writel(S_LAMPS, 3, '<spot>')
+            self.writel(S_LAMPS, 4, '<color>' + strarr(light.color) + '</color>')
             att_by_distance = 2.0 / light.distance  # convert to linear attenuation
-            self.writel(S_LAMPS, 5, '<linear_attenuation>' +
-                        strflt(att_by_distance) + '</linear_attenuation>')
-            self.writel(S_LAMPS, 5, '<falloff_angle>' +
-                        strflt(math.degrees(light.spot_size / 2)) + '</falloff_angle>')
-            self.writel(S_LAMPS, 4, '</spot>')
+            self.writel(S_LAMPS, 4, '<linear_attenuation>' + strflt(att_by_distance) + '</linear_attenuation>')
+            self.writel(S_LAMPS, 4, '<falloff_angle>' + strflt(math.degrees(light.spot_size / 2)) + '</falloff_angle>')
+            self.writel(S_LAMPS, 3, '</spot>')
         else:  # write a sun lamp for everything else (not supported)
-            self.writel(S_LAMPS, 4, '<directional>')
-            self.writel(S_LAMPS, 5, '<color>' +
-                        strarr(light.color) + '</color>')
-            self.writel(S_LAMPS, 4, '</directional>')
+            self.writel(S_LAMPS, 3, '<directional>')
+            self.writel(S_LAMPS, 4, '<color>' + strarr(light.color) + '</color>')
+            self.writel(S_LAMPS, 3, '</directional>')
 
-        self.writel(S_LAMPS, 3, '</technique_common>')
-        # self.writel(S_LAMPS,2,'</optics>')
+        self.writel(S_LAMPS, 2, '</technique_common>')
         self.writel(S_LAMPS, 1, '</light>')
 
     def export_curve(self, curve, spline_id):
@@ -1498,7 +1488,8 @@ class DaeExporter:
         self.writel(S_GEOM, 3, '<source id="' +
                     source_interpolations_id + '">')
         interpolation_values = " ".join([str(x) for x in interps])
-        array_interpolations_id = self.gen_unique_id(spline_id + '-interpolations-array')
+        array_interpolations_id = self.gen_unique_id(
+            spline_id + '-interpolations-array')
         self.writel(S_GEOM, 4, '<Name_array id="'+array_interpolations_id + '" count="' +
                     str(len(interps)) + '">' + interpolation_values + '</Name_array>')
         self.writel(S_GEOM, 4, '<technique_common>')
@@ -1550,10 +1541,10 @@ class DaeExporter:
         if (self.transform_matrix_scale):
             transforms = [
                 self.get_matrix_transform_xml(transform["matrix"]),
-                self.get_scale_xml(transform["scale"])
-                ]
+                self.get_scale_xml(transform["scale"])]
         else:
-            transforms = [self.get_matrix_transform_xml(transform["matrix"])]
+            transforms = [
+                self.get_matrix_transform_xml(transform["matrix"])]
 
         return [e for t in transforms for e in t]
 
@@ -1602,7 +1593,7 @@ class DaeExporter:
 
     def export_node(self, section, node, il, recurse, lookup):
         # export a scene node as a Collada node
-        ##TODO @Zaher option to instance objects
+
         prev_id = lookup["nodes"].get(node, None)
         if prev_id:
             # previously exported node is occurring again
@@ -1616,8 +1607,7 @@ class DaeExporter:
         instance_node = False
 
         if instance_prev_node:
-            self.writel(section, il, '<instance_node url="{}">'.format(
-                self.ref_id(node_id)))
+            self.writel(section, il, '<instance_node url="{}">'.format(self.ref_id(node_id)))
             instance_node = True
             il += 1
         else:
@@ -1632,26 +1622,22 @@ class DaeExporter:
 
             if (not node.is_instancer):
                 if (node.type == "ARMATURE"):
-                    self.export_armature_node(
-                        section, il, node, recurse, lookup)
+                    self.export_armature_node(section, il, node, recurse, lookup)
                 elif (node in lookup["node_to_skin"]):
                     count = 0
                     for skin_lookup in lookup["node_to_skin"][node]:
                         skin_id = skin_lookup['skin']
                         skeleton = skin_lookup['skeleton']
                         skin_sid = "skin" + str(count)
-                        self.writel(section, il, '<instance_controller url="' +
-                                    self.ref_id(skin_id) + '" sid="' + skin_sid + '">')
-                        self.writel(section, il + 1, '<skeleton>#' +
-                                    skeleton + '</skeleton>')
+                        self.writel(section, il, '<instance_controller url="' + self.ref_id(skin_id) + '" sid="' + skin_sid + '">')
+                        self.writel(section, il + 1, '<skeleton>#' + skeleton + '</skeleton>')
                         self.export_material_bind(section, node, il, lookup)
                         self.writel(section, il, "</instance_controller>")
                         count += 1
                 elif (node in lookup["node_to_morph_controller"]):
                     morph_id = lookup["node_to_morph_controller"][node]
                     morph_sid = "morph"
-                    self.writel(section, il, '<instance_controller url="' +
-                                self.ref_id(morph_id) + '" sid="' + morph_sid + '">')
+                    self.writel(section, il, '<instance_controller url="' + self.ref_id(morph_id) + '" sid="' + morph_sid + '">')
                     self.export_material_bind(section, node, il, lookup)
                     self.writel(section, il, "</instance_controller>")
                 elif (node in lookup["node_to_mesh"]):
@@ -1662,12 +1648,10 @@ class DaeExporter:
                     self.writel(section, il, "</instance_geometry>")
                 elif (node.data in lookup["camera"]):
                     camera_id = lookup["camera"][node.data]
-                    self.writel(section, il,
-                                '<instance_camera url="' + self.ref_id(camera_id) + '"/>')
+                    self.writel(section, il, '<instance_camera url="' + self.ref_id(camera_id) + '"/>')
                 elif (node.data in lookup["light"]):
                     light_id = lookup["light"][node.data]
-                    self.writel(section, il,
-                                '<instance_light url="' + self.ref_id(light_id) + '"/>')
+                    self.writel(section, il, '<instance_light url="' + self.ref_id(light_id) + '"/>')
             else:
                 if node.instance_type == "COLLECTION":
                     self.writel(section, il, '<instance_node url="{}"/>'.format(self.ref_library(node.instance_collection)))
@@ -1748,6 +1732,7 @@ class DaeExporter:
             if slot.material not in lookup["material"]}
 
         # export library_effects content
+
         for mat in materials:
             effect_id = self.gen_unique_id(mat.name + "-effect")
             lookup["effect"][mat] = effect_id
@@ -1816,9 +1801,12 @@ class DaeExporter:
         self.writel(S_P_MATS, 1, '<physics_material id ="{}">'.format(
             physics_material_id))
         self.writel(S_P_MATS, 2, '<technique_common>')
-        self.writel(S_P_MATS, 3, '<dynamic_friction>{}</dynamic_friction>'.format(node.rigid_body.friction))
-        self.writel(S_P_MATS, 3, '<static_friction>{}</static_friction>'.format(node.rigid_body.friction))
-        self.writel(S_P_MATS, 3, '<restitution>{}</restitution>'.format(node.rigid_body.restitution))
+        self.writel(
+            S_P_MATS, 3, '<dynamic_friction>{}</dynamic_friction>'.format(node.rigid_body.friction))
+        self.writel(
+            S_P_MATS, 3, '<static_friction>{}</static_friction>'.format(node.rigid_body.friction))
+        self.writel(
+            S_P_MATS, 3, '<restitution>{}</restitution>'.format(node.rigid_body.restitution))
         self.writel(S_P_MATS, 2, '</technique_common>')
         self.writel(S_P_MATS, 1, '</physics_material>')
 
@@ -1845,7 +1833,7 @@ class DaeExporter:
         self.writel(S_P_MODEL, 4, '</mass_frame>')
         self.writel(S_P_MODEL, 4, '<shape>')
         self.writel(S_P_MODEL, 5, '<instance_physics_material url="{}"/>'.format(self.ref_id(lookup['physics_material'][node.data])))
-        self.shape_funcs[node.rigid_body.collision_shape](node, 5, lookup) ##TODO @Zaher test it please
+        self.shape_funcs[node.rigid_body.collision_shape](node, 5, lookup)
         self.export_collision_margin(node, 5)
 
         self.writel(S_P_MODEL, 4, '</shape>')
@@ -1869,17 +1857,16 @@ class DaeExporter:
             self.writel(S_P_MODEL, 5, '<collision_filter_groups>{}</collision_filter_groups>'.format(" ".join(collision_collections)))
         linear_factor = [1.0, 1.0, 1.0]
         angular_factor = [1.0, 1.0, 1.0]
-        self.writel(S_P_MODEL, 5, '<linear_factor>{}</linear_factor>'.format(self.strxyz(linear_factor, True)))
-        self.writel(S_P_MODEL, 5, '<angular_factor>{}</angular_factor>'.format(self.strxyz(angular_factor, True)))
+        self.writel(
+            S_P_MODEL, 5, '<linear_factor>{}</linear_factor>'.format(self.strxyz(linear_factor, True)))
+        self.writel(
+            S_P_MODEL, 5, '<angular_factor>{}</angular_factor>'.format(self.strxyz(angular_factor, True)))
         self.writel(S_P_MODEL, 4, '</technique>')
         self.writel(S_P_MODEL, 3, '</extra>')
         self.writel(S_P_MODEL, 2, '</rigid_body>')
         self.writel(S_P_MODEL, 1, '</physics_model>')
 
     def export_physics_scene(self, physics_nodes, lookup):
-        if (self.bpy_context_scene.rigidbody_world is None):
-            return
-
         physics_scene_id = self.gen_unique_id(
             self.bpy_context_scene.name + '-physics')
         self.writel(
@@ -2000,9 +1987,11 @@ class DaeExporter:
     def export_cylinder_shape(self, node, il, lookup):
         dimensions = self.get_node_dimensions(node)
         self.writel(S_P_MODEL, il, "<cylinder>")
-        self.writel(S_P_MODEL, il + 1, "<height>{}</height>".format(dimensions[2]))
+        self.writel(S_P_MODEL, il + 1,
+                    "<height>{}</height>".format(dimensions[2]))
         radius = max(dimensions[0], dimensions[1]) / 2.0
-        self.writel(S_P_MODEL, il + 1, "<radius>{} {}</radius>".format(radius, radius))
+        self.writel(S_P_MODEL, il + 1,
+                    "<radius>{} {}</radius>".format(radius, radius))
         self.writel(S_P_MODEL, il, "</cylinder>")
 
     def export_cone_shape(self, node, il, lookup):
@@ -2049,7 +2038,8 @@ class DaeExporter:
     def export_scene(self, lookup):
 
         visual_scene_id = self.gen_unique_id(self.bpy_context_scene.name)
-        self.writel(S_NODES, 1, '<visual_scene id="' + visual_scene_id + '" name="' + self.bpy_context_scene.name + '">')
+        self.writel(S_NODES, 1, '<visual_scene id="' + visual_scene_id +
+                    '" name="' + self.bpy_context_scene.name + '">')
 
         for obj in self.visual_nodes:
             if (obj.parent is None):
@@ -2061,10 +2051,13 @@ class DaeExporter:
         self.writel(S_ASSET, 0, '<asset>')
         self.writel(S_ASSET, 1, '<contributor>')
         self.writel(S_ASSET, 2, '<author> Anonymous </author>')
-        self.writel(S_ASSET, 2, '<authoring_tool> Collada Exporter for Blender 2.9+, by Gregery Barton </authoring_tool>')
+        self.writel(
+            S_ASSET, 2, '<authoring_tool> Collada Exporter for Blender 2.9+, by Gregery Barton </authoring_tool>')
         self.writel(S_ASSET, 1, '</contributor>')
-        self.writel(S_ASSET, 1, '<created>' + time.strftime("%Y-%m-%dT%H:%M:%SZ  ") + '</created>')
-        self.writel(S_ASSET, 1, '<modified>' + time.strftime("%Y-%m-%dT%H:%M:%SZ") + '</modified>')
+        self.writel(S_ASSET, 1, '<created>' +
+                    time.strftime("%Y-%m-%dT%H:%M:%SZ  ") + '</created>')
+        self.writel(S_ASSET, 1, '<modified>' +
+                    time.strftime("%Y-%m-%dT%H:%M:%SZ") + '</modified>')
         self.writel(S_ASSET, 1, '<unit meter="1.0" name="meter"/>')
         if self.axis_type == "ZUP":
             axis = "Z_UP"
@@ -2596,6 +2589,8 @@ class DaeExporter:
                 self.unmute_timeline()
 
     def export(self):
+        
+        self.has_physics = (self.config["version"] == "150") and self.bpy_context_scene.rigidbody_world
 
         self.writel(S_GEOM, 0, '<library_geometries>')
         self.writel(S_CONT, 0, '<library_controllers>')
@@ -2606,9 +2601,10 @@ class DaeExporter:
         self.writel(S_FX, 0, '<library_effects>')
         self.writel(S_LIBRARY_NODES, 0, '<library_nodes>')
         self.writel(S_NODES, 0, '<library_visual_scenes>')
-        self.writel(S_P_MATS, 0, '<library_physics_materials>')
-        self.writel(S_P_MODEL, 0, '<library_physics_models>')
-        self.writel(S_P_SCENE, 0, '<library_physics_scenes>')
+        if self.has_physics:
+            self.writel(S_P_MATS, 0, '<library_physics_materials>')
+            self.writel(S_P_MODEL, 0, '<library_physics_models>')
+            self.writel(S_P_SCENE, 0, '<library_physics_scenes>')
         self.writel(S_ANIM, 0, '<library_animations>')
         self.writel(S_ANIM_CLIPS, 0, '<library_animation_clips>')
 
@@ -2680,10 +2676,11 @@ class DaeExporter:
                 self.export_collections(lookup)
                 self.export_scene(lookup)
 
-                physics_nodes = [node
-                                 for node in self.visual_nodes
-                                 if (node.rigid_body and node.rigid_body.collision_shape)]
-                self.export_physics_nodes(physics_nodes, lookup)
+                if self.has_physics:
+                    physics_nodes = [node
+                                    for node in self.visual_nodes
+                                    if (node.rigid_body and node.rigid_body.collision_shape)]
+                    self.export_physics_nodes(physics_nodes, lookup)
 
             finally:
                 self.restore_scene_pose()
@@ -2711,9 +2708,10 @@ class DaeExporter:
         self.writel(S_GEOM, 0, '</library_geometries>')
         self.writel(S_LIBRARY_NODES, 0, '</library_nodes>')
         self.writel(S_NODES, 0, '</library_visual_scenes>')
-        self.writel(S_P_MODEL, 0, '</library_physics_models>')
-        self.writel(S_P_MATS, 0, '</library_physics_materials>')
-        self.writel(S_P_SCENE, 0, '</library_physics_scenes>')
+        if self.has_physics:
+            self.writel(S_P_MODEL, 0, '</library_physics_models>')
+            self.writel(S_P_MATS, 0, '</library_physics_materials>')
+            self.writel(S_P_SCENE, 0, '</library_physics_scenes>')
         self.writel(S_ANIM_CLIPS, 0, '</library_animation_clips>')
         self.writel(S_ANIM, 0, '</library_animations>')
 
@@ -2723,10 +2721,13 @@ class DaeExporter:
             return False
         try:
             f.write(bytes('<?xml version="1.0" encoding="utf-8"?>\n', "UTF-8"))
-            if self.config['opensim']:
-                f.write(bytes('<COLLADA xmlns="http://www.collada.org/2005/11/COLLADASchema" version="1.4.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">\n', "UTF-8"))
+            
+            if self.config["version"] == "150":
+                f.write(bytes(
+                    '<COLLADA xmlns="http://www.collada.org/2008/03/COLLADASchema" version="1.5.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">\n', "UTF-8"))
             else:
-                f.write(bytes('<COLLADA xmlns="http://www.collada.org/2008/03/COLLADASchema" version="1.5.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">\n', "UTF-8"))
+                f.write(bytes(
+                    '<COLLADA xmlns="http://www.collada.org/2005/11/COLLADASchema" version="1.4.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">\n', "UTF-8"))
 
             s = []
             for x in self.sections.keys():
@@ -2738,11 +2739,9 @@ class DaeExporter:
 
             f.write(bytes('<scene>\n', "UTF-8"))
             scene = bpy.context.scene
-            f.write(bytes('\t<instance_visual_scene url="' +
-                          self.ref_id(scene.name) + '"/>\n', "UTF-8"))
-            if (self.bpy_context_scene.rigidbody_world):
-                f.write(bytes('\t<instance_physics_scene url="' +
-                        self.ref_id(scene.name) + '-physics' + '"/>\n', "UTF-8"))
+            f.write(bytes('\t<instance_visual_scene url="' + self.ref_id(scene.name) + '"/>\n', "UTF-8"))
+            if (self.has_physics):
+                f.write(bytes('\t<instance_physics_scene url="' + self.ref_id(scene.name) + '-physics' + '"/>\n', "UTF-8"))
             f.write(bytes('</scene>\n', "UTF-8"))
             f.write(bytes('</COLLADA>\n', "UTF-8"))
         finally:
@@ -2762,9 +2761,9 @@ class DaeExporter:
         self.image_cache = set()
         self.axis_type = self.config['axis_type']
         self.use_tangents = self.config['calc_tangents']
+        self.triangulate = self.config['triangulate']
         self.overstuff_bones = False
         self.use_active_layers = False
-        self.config['opensim'] = True
 
 def save(operator, context,
          filepath="",
